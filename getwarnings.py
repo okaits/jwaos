@@ -42,7 +42,9 @@ with urllib.request.urlopen(url="https://www.jma.go.jp/bosai/common/const/area.j
         parser = argparse.ArgumentParser(description='Obtain warnings and alerts from JMA.\n'\
             'Read README.md to know how to get Municipal district code.')
         parser.add_argument('-v', '--verbose', action='store_true', help="Verbose")
-        parser.add_argument('-p', '--program', action='store_true', help=argparse.SUPPRESS)
+        parser.add_argument('-j', '--json', action='store_true', help=argparse.SUPPRESS)
+        parser.add_argument('--location', action='store_true', help=argparse.SUPPRESS)
+        parser.add_argument('--station', action='store_true', help=argparse.SUPPRESS)
         parser.add_argument('class20s_code', type=int,
             metavar="<Municipal district code>",  help="Municipal district code")
         args = parser.parse_args()
@@ -57,9 +59,15 @@ with urllib.request.urlopen(url="https://www.jma.go.jp/bosai/common/const/area.j
         offices_code = int(area_dict["class10s"][class10s_code]["parent"])
         centers_code = int(area_dict["offices"][offices_code]["parent"])
 
-        if args.program is True:
+        if args.json is True:
+            if args.location is True:
+                print(_get_area_name(area_dict, class20s_code, offices_code))
+                return
+            elif args.station is True:
+                print(_get_weather_station_center_name(area_dict, centers_code))
+                return
             print(_get_warning_data(offices_code, class20s_code))
-            exit()
+            return
 
         if args.verbose is True:
             print(f"Weather station code: {centers_code}")
