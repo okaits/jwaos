@@ -49,16 +49,17 @@ with urllib.request.urlopen(url="https://www.jma.go.jp/bosai/common/const/area.j
             metavar="<Municipal district code>",  help="Municipal district code")
         args = parser.parse_args()
 
-        # Set area_json
+        # Create area_json
         area_dict = pd.read_json(area).to_dict()
 
-        # Convert class20s_code to other code
+        # Convert class20s_code to other codes
         class20s_code = args.class20s_code
         class15s_code = int(area_dict["class20s"][class20s_code]["parent"])
         class10s_code = int(area_dict["class15s"][class15s_code]["parent"])
         offices_code = int(area_dict["class10s"][class10s_code]["parent"])
         centers_code = int(area_dict["offices"][offices_code]["parent"])
 
+        # Main code
         if args.json is True:
             if args.location is True:
                 print(_get_area_name(area_dict, class20s_code, offices_code))
@@ -87,7 +88,7 @@ with urllib.request.urlopen(url="https://www.jma.go.jp/bosai/common/const/area.j
             if data is False:
                 print("No warnings and alerts.")
             else:
-                print("- " + "\n- ".join(data))
+                print(" ".join(data))
 
     if __name__ == '__main__':
         main()
