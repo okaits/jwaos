@@ -6,6 +6,8 @@ See README.md for more information.
 import argparse
 import urllib.request
 import json
+import os
+import sys
 import pandas as pd
 
 with urllib.request.urlopen(url="https://www.jma.go.jp/bosai/common/const/area.json") as area:
@@ -36,32 +38,105 @@ with urllib.request.urlopen(url="https://www.jma.go.jp/bosai/common/const/area.j
                 return False
             return warning_texts
 
+    def _config(configfile_path, class20s_code, config_only):
+        if os.path.exists(configfile_path):
+            if config_only is True:
+                print("Error 005: Config file already exists. "\
+                    "Please remove it by --clear-config option.", file=sys.stderr)
+                return 5
+            if class20s_code is not None:
+                print("Info: Config file exists, but found --mdcode. Not loading config...",
+                    file=sys.stderr)
+                return class20s_code
+            print("Info: Config file exists. Loading config...", file=sys.stderr)
+            with open(configfile_path, "r", encoding="utf-8") as configfile:
+                try:
+                    config = json.load(configfile)
+                    class20s_code = config["location"]["class20s_code"]
+                except KeyError:
+                    print("Error 002: Config file is broken.", file=sys.stderr)
+                    return 2
+                except Exception: # pylint: disable=W0703
+                    print("Error 003: Something went wrong while loading config file. "\
+                        "Config file may be broken.", file=sys.stderr)
+                    return 3
+            return class20s_code
+        elif not os.path.exists(configfile_path):
+            if config_only is not True:
+                print("Info: Config file not exists. Creating config file...")
+            with open(configfile_path, "w", encoding="utf-8") as configfile:
+                config = {}
+                config["location"] = {}
+                if class20s_code is None:
+                    print("Error 001: --mdcode is required "\
+                        "for creating config file.", file=sys.stderr)
+                    return 1
+                config["location"]["class20s_code"] = class20s_code
+                json.dump(config, configfile, ensure_ascii=False, indent=4)
+                return class20s_code
+
+
+
     def main():
         """ Main Function """
         # Get arguments
         parser = argparse.ArgumentParser(description='Obtain warnings and alerts from JMA.\n'\
             'Read README.md to know how to get Municipal district code.')
-        parser.add_argument('-v', '--verbose', action='store_true', help="Verbose")
+        parser.add_argument('-v', '--verbose', action='store_true', help="Verbose [default=False]")
         parser.add_argument('-j', '--json', action='store_true', help=argparse.SUPPRESS)
-        parser.add_argument('class20s_code', type=int,
-            metavar="<Municipal district code>",  help="Municipal district code")
+        parser.add_argument('-c', '--config', dest='configfile_path',
+            action='store_true', help='Config file path. Needed by -C or first execute. '\
+                '[default=config.json]', default="config.json")
+        parser.add_argument('-C', '--config-only', dest="config_only", action="store_true",
+            help="Create config file and exit.")
+        parser.add_argument('--clear-config', action='store_true', help='Clear config file. '\
+            'Requires --config', dest="clear_config")
+        parser.add_argument('-m', '--mdcode', type=int, required=False,  dest="class20s_code",
+            metavar="<Municipal district code>", help="Set municipal district code.")
         args = parser.parse_args()
 
         # Create area_json
         area_dict = pd.read_json(area).to_dict()
 
+        # --clear-config option
+        if args.clear_config is True:
+            print("Removing config file...")
+            os.remove(args.configfile_path)
+            print("Done.")
+            return
+
+        # --only-config option
+        if args.config_only is True:
+            _config(args.configfile_path, args.class20s_code, True)
+            return
+
+        # Get class20s_code from config file
+        class20s_code = _config(args.configfile_path, args.class20s_code, False)
+
+        if class20s_code == 1:
+            os.remove(args.configfile_path)
+            return False
+        if class20s_code in (2, 3):
+            return False
+
         # Convert class20s_code to other codes
-        class20s_code = args.class20s_code
-        class15s_code = int(area_dict["class20s"][class20s_code]["parent"])
+        try:
+            class15s_code = int(area_dict["class20s"][class20s_code]["parent"])
+        except KeyError:
+            print("Error 004: Your municipal district code may be not correct.")
+            return False
+
         class10s_code = int(area_dict["class15s"][class15s_code]["parent"])
         offices_code = int(area_dict["class10s"][class10s_code]["parent"])
         centers_code = int(area_dict["offices"][offices_code]["parent"])
 
         # Main code
         if args.json is True:
-            output = dict()
-            output["station"] = {"code": centers_code, "name": _get_weather_station_center_name(area_dict, centers_code)}
-            output["location"] = {"class20s_code": class20s_code, "name": _get_area_name(area_dict, class20s_code, offices_code)}
+            output = {}
+            output["station"] = {"code": centers_code,
+                "name": _get_weather_station_center_name(area_dict, centers_code)}
+            output["location"] = {"class20s_code": class20s_code,
+                "name": _get_area_name(area_dict, class20s_code, offices_code)}
             print(json.dumps(output, ensure_ascii=False))
             return
 
@@ -86,4 +161,7 @@ with urllib.request.urlopen(url="https://www.jma.go.jp/bosai/common/const/area.j
                 print(" ".join(data))
 
     if __name__ == '__main__':
-        main()
+        if main() is False:
+            exit(1)
+        else:
+            exit(0)
