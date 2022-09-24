@@ -12,12 +12,12 @@ with urllib.request.urlopen(url="https://www.jma.go.jp/bosai/common/const/area.j
 
     def _get_area_name(area_dict, class20s_code, offices_code):
         """ Get area name."""
-        return area_dict["offices"][offices_code]["name"] + \
-            area_dict["class20s"][class20s_code]["name"]
+        return area_dict["offices"][int(offices_code)]["name"] + \
+            area_dict["class20s"][int(class20s_code)]["name"]
 
     def _get_weather_station_center_name(area_dict, centers_code):
         """ Get Weather station center's name. """
-        return area_dict["centers"][centers_code]["officeName"]
+        return area_dict["centers"][int(centers_code)]["officeName"]
 
     def _get_warning_data(areacode1, class20s_code):
         """ Get warning and alerts data."""
@@ -51,11 +51,11 @@ with urllib.request.urlopen(url="https://www.jma.go.jp/bosai/common/const/area.j
         area_dict = pd.read_json(area).to_dict()
 
         # Convert class20s_code to other code
-        class20s_code = args.class20s_code
-        class15s_code = int(area_dict["class20s"][class20s_code]["parent"])
-        class10s_code = int(area_dict["class15s"][class15s_code]["parent"])
-        offices_code = int(area_dict["class10s"][class10s_code]["parent"])
-        centers_code = int(area_dict["offices"][offices_code]["parent"])
+        class20s_code = str(args.class20s_code).zfill(7)
+        class15s_code = area_dict["class20s"][int(class20s_code)]["parent"].zfill(7)
+        class10s_code = area_dict["class15s"][int(class15s_code)]["parent"].zfill(7)
+        offices_code = area_dict["class10s"][int(class10s_code)]["parent"].zfill(6)
+        centers_code = area_dict["offices"][int(offices_code)]["parent"].zfill(7)
 
         if args.program is True:
             print(_get_warning_data(offices_code, class20s_code))
