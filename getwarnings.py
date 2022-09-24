@@ -14,16 +14,17 @@ with urllib.request.urlopen(url="https://www.jma.go.jp/bosai/common/const/area.j
 
     def _get_area_name(area_dict, class20s_code, offices_code):
         """ Get area name."""
-        return area_dict["offices"][offices_code]["name"] + \
-            area_dict["class20s"][class20s_code]["name"]
+        return area_dict["offices"][int(offices_code)]["name"] + \
+            area_dict["class20s"][int(class20s_code)]["name"]
 
     def _get_weather_station_center_name(area_dict, centers_code):
         """ Get Weather station center's name. """
-        return area_dict["centers"][centers_code]["officeName"]
+        return area_dict["centers"][int(centers_code)]["officeName"]
 
-    def _get_warning_data(areacode1, class20s_code):
+    def _get_warning_data(offices_code, class20s_code, json_output):
         """ Get warning and alerts data."""
-        url = f'https://www.jma.go.jp/bosai/warning/data/warning/{areacode1}.json'
+        url = f'https://www.jma.go.jp/bosai/warning/data/warning/{offices_code}.json'
+        print(url)
         with open("warnings.json", "r", encoding="utf-8") as warningnames,\
                 urllib.request.urlopen(url=url) as warningdata:
             warningdata_dict = json.loads(warningdata.read())
@@ -33,6 +34,8 @@ with urllib.request.urlopen(url="https://www.jma.go.jp/bosai/common/const/area.j
                 if areainfo["code"] == str(class20s_code)
                 for warning in areainfo["warnings"]
                 if warning["status"] == "発表" or warning["status"] == "継続"]
+            if json_output is True:
+                return warning_codes
             warning_texts = [warningnames_dict["warningnames"][code] for code in warning_codes]
             if warning_texts == []:
                 return False
@@ -111,7 +114,7 @@ with urllib.request.urlopen(url="https://www.jma.go.jp/bosai/common/const/area.j
             return
 
         # Get class20s_code from config file
-        class20s_code = _config(args.configfile_path, args.class20s_code, False)
+        class20s_code = str(_config(args.configfile_path, args.class20s_code)).zfill(7) #7
 
         if class20s_code == 1:
             os.remove(args.configfile_path)
@@ -121,14 +124,14 @@ with urllib.request.urlopen(url="https://www.jma.go.jp/bosai/common/const/area.j
 
         # Convert class20s_code to other codes
         try:
-            class15s_code = int(area_dict["class20s"][class20s_code]["parent"])
+            class15s_code = area_dict["class20s"][int(class20s_code)]["parent"].zfill(7)
         except KeyError:
             print("Error 004: Your municipal district code may be not correct.")
             return False
 
-        class10s_code = int(area_dict["class15s"][class15s_code]["parent"])
-        offices_code = int(area_dict["class10s"][class10s_code]["parent"])
-        centers_code = int(area_dict["offices"][offices_code]["parent"])
+        class10s_code = area_dict["class15s"][int(class15s_code)]["parent"].zfill(7)
+        offices_code = area_dict["class10s"][int(class10s_code)]["parent"].zfill(6)
+        centers_code = area_dict["offices"][int(offices_code)]["parent"].zfill(7)
 
         # Main code
         if args.json is True:
